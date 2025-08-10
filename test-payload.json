@@ -1,0 +1,14 @@
+{
+  "Records": [
+    {
+      "s3": {
+        "bucket": {
+          "name": "recording.htface"
+        },
+        "object": {
+          "key": "main-room/test22_20250810-062738.mp4"
+        }
+      }
+    }
+  ]
+} 

@@ -1,21 +1,28 @@
 #!/usr/bin/env node
+import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { MergeTranlatorAndMainRoomStack } from '../lib/merge_tranlator_and_main_room-stack';
+import { VideoMergeEcsStack } from '../lib/video-merge-ecs-stack';
+import { AutomatedVideoProcessorStack } from '../lib/automated-video-processor-stack';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 
 const app = new cdk.App();
-new MergeTranlatorAndMainRoomStack(app, 'MergeTranlatorAndMainRoomStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
-  env: { account: '636887979291', region: 'us-east-1' },
+// ECS-based manual trigger stack
+const videoMergeStack = new VideoMergeEcsStack(app, 'VideoMergeEcsStack', {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  },
 });
+
+// New automated video processor stack
+const automatedStack = new AutomatedVideoProcessorStack(app, 'AutomatedVideoProcessorStack', {
+  videoMergeLambda: videoMergeStack.videoMergeLambda,
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION
+  },
+});
+
+// Establish dependency: AutomatedVideoProcessorStack depends on VideoMergeEcsStack
+automatedStack.addDependency(videoMergeStack);
