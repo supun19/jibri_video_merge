@@ -1,0 +1,13 @@
+{
+  "name": "video-merge-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function for merging video and audio using AWS MediaConvert",
+  "main": "video-merge.js",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-mediaconvert": "^3.0.0"
+  },
+  "scripts": {
+    "package": "zip -r function.zip . -x '*.zip' 'node_modules/*' '*.git*'"
+  }
+} 
