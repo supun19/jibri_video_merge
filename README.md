@@ -306,3 +306,8 @@ For issues or questions:
 4. Check MediaConvert service status in your region
 5. Monitor SNS and SQS message flow
 6. Verify Lambda function environment variables and permissions
+
+
+## deploy 
+npx cdk deploy AutomatedVideoProcessorStack --profile htface
+
