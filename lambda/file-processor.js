@@ -80,6 +80,9 @@ function isWithinTimeWindow(timestamp1, timestamp2, windowMinutes = 15) {
 async function addFileRecord(roomName, timestamp, fileType, fileKey) {
   const ttl = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 hours from now
   
+  // Normalize room name to lowercase for case-insensitive matching
+  const normalizedRoomName = roomName.toLowerCase();
+  
   // Normalize timestamp to consistent format
   let normalizedTimestamp;
   if (fileType === 'main') {
@@ -101,13 +104,13 @@ async function addFileRecord(roomName, timestamp, fileType, fileKey) {
     const existingRecord = await dynamodb.send(new GetItemCommand({
       TableName: process.env.DYNAMODB_TABLE,
       Key: marshall({
-        roomName: roomName,
+        roomName: normalizedRoomName,
         timestamp: normalizedTimestamp
       })
     }));
 
     if (existingRecord.Item) {
-      console.log(`Record already exists for ${roomName} at ${normalizedTimestamp}, skipping duplicate`);
+      console.log(`Record already exists for ${normalizedRoomName} at ${normalizedTimestamp}, skipping duplicate`);
       return true; // Return true since we don't want to fail the process
     }
   } catch (error) {
@@ -116,7 +119,8 @@ async function addFileRecord(roomName, timestamp, fileType, fileKey) {
   }
   
   const item = marshall({
-    roomName: roomName,
+    roomName: normalizedRoomName, // Store normalized room name
+    originalRoomName: roomName,    // Keep original for reference
     timestamp: normalizedTimestamp, // Store normalized format
     originalTimestamp: timestamp,   // Keep original for reference
     fileType: fileType,
@@ -141,7 +145,10 @@ async function addFileRecord(roomName, timestamp, fileType, fileKey) {
 // Find matching file for the same room within time window
 async function findMatchingFile(roomName, currentTimestamp, currentFileType, timeWindowMinutes = 15) {
   try {
-    console.log('Finding matching file for room:', roomName);
+    // Normalize room name to lowercase for case-insensitive matching
+    const normalizedRoomName = roomName.toLowerCase();
+    
+    console.log('Finding matching file for room:', normalizedRoomName);
     console.log('Current timestamp:', currentTimestamp);
     console.log('Current file type:', currentFileType);
     console.log('Time window:', timeWindowMinutes);
@@ -156,7 +163,7 @@ async function findMatchingFile(roomName, currentTimestamp, currentFileType, tim
       FilterExpression: 'roomName = :roomName',
       ExpressionAttributeValues: marshall({
         ':fileType': oppositeType,
-        ':roomName': roomName
+        ':roomName': normalizedRoomName
       })
     }));
     console.log('Response:', response);
@@ -253,7 +260,10 @@ exports.handler = async (event) => {
     }
 
     const { roomName, timestamp, fileType } = fileInfo;
-    console.log(`Parsed file info:`, { roomName, timestamp, fileType });
+    // Normalize room name to lowercase for case-insensitive matching
+    const normalizedRoomName = roomName.toLowerCase();
+    
+    console.log(`Parsed file info:`, { roomName, normalizedRoomName, timestamp, fileType });
 
     // Add file record to DynamoDB
     const recordAdded = await addFileRecord(roomName, timestamp, fileType, fileKey);
@@ -279,7 +289,7 @@ exports.handler = async (event) => {
       }
 
       // Trigger video merge via existing Lambda
-      const mergeResult = await triggerVideoMerge(mainVideoKey, translatorVideoKey, roomName);
+      const mergeResult = await triggerVideoMerge(mainVideoKey, translatorVideoKey, normalizedRoomName);
       
       if (mergeResult.success) {
         console.log('Video merge triggered successfully');
@@ -287,7 +297,8 @@ exports.handler = async (event) => {
           statusCode: 200,
           body: JSON.stringify({
             message: 'File processed and video merge triggered',
-            roomName: roomName,
+            roomName: normalizedRoomName,
+            originalRoomName: roomName,
             mainVideoKey: mainVideoKey,
             translatorVideoKey: translatorVideoKey,
             mergeTriggered: true
@@ -297,12 +308,13 @@ exports.handler = async (event) => {
         throw new Error(`Failed to trigger video merge: ${mergeResult.error}`);
       }
     } else {
-      console.log(`No matching file found for room ${roomName} within ${timeWindowMinutes} minutes`);
+      console.log(`No matching file found for room ${normalizedRoomName} within ${timeWindowMinutes} minutes`);
       return {
         statusCode: 200,
         body: JSON.stringify({
           message: 'File processed and recorded, waiting for matching file',
-          roomName: roomName,
+          roomName: normalizedRoomName,
+          originalRoomName: roomName,
           fileType: fileType,
           timestamp: timestamp
         })
